@@ -17,9 +17,9 @@ did for Pacman and Debian packages.
 
 ## How to get a package format right
 
-Before we get to RPM, let's have a brief look at how a sane package format looks. I always use the package for `tree(1)`
-as a sample because it's a small package with just one executable and maybe a manpage that's available on every
-distribution.
+Before we get to RPM, let's have a brief look at how a sane package format looks like. I always use the package for
+`tree(1)` as a sample because it's a small package with just one executable and maybe a manpage that's available on
+every distribution.
 
 ```
 $ file -kr tree_1.7.0-3_amd64.deb
