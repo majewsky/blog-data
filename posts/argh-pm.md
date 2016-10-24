@@ -347,7 +347,7 @@ This tells us that the payload is a CPIO archive, compressed with XZ. You know, 
 is [no way at all to infer this from the payload itself][magic]. Fun fact: This part of the dump shows that this Fedora
 RPM is actually *not LSB-compliant*. The LSB spec states clearly that the payload compressor must be `gzip`, and that
 `RPMTAG_PAYLOADFLAGS` must be `9`. If you're wondering what payload flags are: "This tag indicates the compression level
-used for the Payload." We've reached negative usefulness values now.
+used for the Payload." We've reached negative usefulness values.
 
 [magic]: https://en.wikipedia.org/wiki/Magic_number_(programming)
 
@@ -370,13 +370,696 @@ tag 1082 (CHANGELOGTEXT): length 70
     string: - drop a non-upstream patch that disabled color output by default (#1284657)
     string: - Rebuilt for https://fedoraproject.org/wiki/Fedora_24_Mass_Rebuild
     string: - Rebuilt for https://fedoraproject.org/wiki/Fedora_23_Mass_Rebuild
+    [...]
 ```
 
-A `changelog.txt` is for filthy peasants! Real men store their changelog in a structured key-value database!
+A `changelog.txt` is for filthy peasants. Real men store their changelog in a structured key-value database. I don't
+understand why they didn't split `RPMTAG_CHANGELOGNAME` into author name, author e-mail and package version, though.
 
 But wait, there's more!
 
-<!-- TODO: file attributes, package relations; signature section; payload -->
+Every package format I looked at knows four types of relations to other packages:
 
-<!-- TODO: note to self - don't forget about the funny enums in rpmlib.h -->
+* depends/requires (the other thing, or something providing the other thing, needs to be installed when this one is installed)
+* provides (the reverse of depends, basically)
+* conflicts (this one and the other thing may not be installed at the same time)
+* obsoletes (if the other thing is installed, replace it with this one during upgrades)
 
+Here's how RPM does package relations:
+
+```
+tag 1047 (PROVIDENAME): length 2
+    string: tree
+    string: tree(x86-64)
+tag 1112 (PROVIDEFLAGS): length 2
+    int32: 8 = 0x8 = 0o10
+    int32: 8 = 0x8 = 0o10
+tag 1113 (PROVIDEVERSION): length 2
+    string: 1.7.0-7.fc26
+    string: 1.7.0-7.fc26
+```
+
+If this were a Debian package, this part would look like
+
+```
+
+
+```
+
+because it's extremely obvious that `tree` and `tree(x86-64)` are provided by the x86\_64 package that's literally
+called `tree` and nobody would ever want to write that down. If you wonder what the `RPMTAG_PROVIDEFLAGS` are:
+
+```c
+/** \ingroup rpmds
+ * Dependency Attributes.
+ */
+enum rpmsenseFlags_e {
+    RPMSENSE_ANY	= 0,
+    RPMSENSE_LESS	= (1 << 1),
+    RPMSENSE_GREATER	= (1 << 2),
+    RPMSENSE_EQUAL	= (1 << 3),
+    /* bit 4 unused */
+    RPMSENSE_POSTTRANS	= (1 << 5),	/*!< %posttrans dependency */
+    RPMSENSE_PREREQ	= (1 << 6), 	/* legacy prereq dependency */
+    RPMSENSE_PRETRANS	= (1 << 7),	/*!< Pre-transaction dependency. */
+    RPMSENSE_INTERP	= (1 << 8),	/*!< Interpreter used by scriptlet. */
+    RPMSENSE_SCRIPT_PRE	= (1 << 9),	/*!< %pre dependency. */
+    RPMSENSE_SCRIPT_POST = (1 << 10),	/*!< %post dependency. */
+    RPMSENSE_SCRIPT_PREUN = (1 << 11),	/*!< %preun dependency. */
+    RPMSENSE_SCRIPT_POSTUN = (1 << 12), /*!< %postun dependency. */
+    RPMSENSE_SCRIPT_VERIFY = (1 << 13),	/*!< %verify dependency. */
+    RPMSENSE_FIND_REQUIRES = (1 << 14), /*!< find-requires generated dependency. */
+    RPMSENSE_FIND_PROVIDES = (1 << 15), /*!< find-provides generated dependency. */
+
+    RPMSENSE_TRIGGERIN	= (1 << 16),	/*!< %triggerin dependency. */
+    RPMSENSE_TRIGGERUN	= (1 << 17),	/*!< %triggerun dependency. */
+    RPMSENSE_TRIGGERPOSTUN = (1 << 18),	/*!< %triggerpostun dependency. */
+    RPMSENSE_MISSINGOK	= (1 << 19),	/*!< suggests/enhances hint. */
+    /* bits 20-23 unused */
+    RPMSENSE_RPMLIB = (1 << 24),	/*!< rpmlib(feature) dependency. */
+    RPMSENSE_TRIGGERPREIN = (1 << 25),	/*!< %triggerprein dependency. */
+    RPMSENSE_KEYRING	= (1 << 26),
+    /* bit 27 unused */
+    RPMSENSE_CONFIG	= (1 << 28)
+};
+```
+
+The name of the enum is probably a typing error because there is no sense anywhere to be found in RPM. The typical
+reaction to this code snippet goes like: "Let's see... zero is any, that makes sense. Then we have less, greater,
+equal... so far so good. Bit 4 is unused, well some legacy is to be expected. Then we have... What? Posttrans
+dependencies?  Interpreter used by what? rpmlib feature what what? And what the fuck is a keyring dependency?!?"
+
+Now I can't explain every last bit of this since I reacted the same way, and documentation ranges from sparse to
+non-existent. But I can enlighten you on a particular bit in this field, `RPMSENSE_RPMLIB`. Let's look at the
+dependencies this package requires:
+
+```
+tag 1048 (REQUIREFLAGS): length 11
+    int32: 16384 = 0x4000 = 0o40000
+    int32: 16384 = 0x4000 = 0o40000
+    int32: 16384 = 0x4000 = 0o40000
+    int32: 16384 = 0x4000 = 0o40000
+    int32: 16384 = 0x4000 = 0o40000
+    int32: 16384 = 0x4000 = 0o40000
+    int32: 16777226 = 0x100000A = 0o100000012
+    int32: 16777226 = 0x100000A = 0o100000012
+    int32: 16777226 = 0x100000A = 0o100000012
+    int32: 16777226 = 0x100000A = 0o100000012
+    int32: 16384 = 0x4000 = 0o40000
+tag 1049 (REQUIRENAME): length 11
+    string: libc.so.6()(64bit)
+    string: libc.so.6(GLIBC_2.14)(64bit)
+    string: libc.so.6(GLIBC_2.2.5)(64bit)
+    string: libc.so.6(GLIBC_2.3)(64bit)
+    string: libc.so.6(GLIBC_2.3.4)(64bit)
+    string: libc.so.6(GLIBC_2.4)(64bit)
+    string: rpmlib(CompressedFileNames)
+    string: rpmlib(FileDigests)
+    string: rpmlib(PayloadFilesHavePrefix)
+    string: rpmlib(PayloadIsXz)
+    string: rtld(GNU_HASH)
+tag 1050 (REQUIREVERSION): length 11
+    string: 
+    string: 
+    string: 
+    string: 
+    string: 
+    string: 
+    string: 3.0.4-1
+    string: 4.6.0-1
+    string: 4.0-1
+    string: 5.2-1
+    string: 
+```
+
+I have no idea why there are six dependencies to different versions of `libc.so.6`, and why they encoded the version in
+the name field rather than in the version field. But the thing that's even more brilliant is the four dependencies below
+that. The flags include the `RPMSENSE_RPMLIB` bit from before, and the names are all like `rpmlib(SomeThing)`. Let's
+write them down more nicely:
+
+```
+rpmlib(CompressedFileNames) = 3.0.4-1
+rpmlib(FileDigests) = 4.6.0-1
+rpmlib(PayloadFilesHavePrefix) = 4.0-1
+rpmlib(PayloadIsXz) = 5.2-1
+```
+
+These dependencies are not actually dependencies. They are parsed by the RPM executable (hence the flag name "rpmlib")
+and trigger certain behavior.
+
+Let me quickly recap how we got here: We are inside the third section of a file format, in a key-value database
+describing the package contents, in a very specific and completely unrelated part of the database, and people suddenly
+start embedding structure information about the package itself in it.
+
+I literally can't even.
+
+(The only way I can explain this is that the dependency field is something that's readily accessible to packagers and
+flexible enough to store build options in without breaking older RPM implementations that try to read the spec.)
+
+What are these version strings about, you say? Nothing. Just [arbitrary, hard-coded values][hardcoded] that must be
+replicated bit by bit if you want to generate a valid RPM. Please take a moment to let this sink in: The version field
+is filled with arbitrary magic numbers where it is irrelevant, but empty for the glibc dependencies where it would
+actually make sense.
+
+[hardcoded]: https://github.com/Distrotech/rpm/blob/0fad88f82bc278cb4788993164f49b97feb78031/build/files.c#L1114
+
+And of course, the `PayloadIsXz` dependency is a duplicate of `RPMTAG_PAYLOADCOMPRESSOR` that we saw earlier. The word
+you're looking for right now is "fractal clusterfuck".
+
+But wait, there's more!
+
+We haven't covered the largest group of tags in this header section. I'll copy-paste it in its
+entirety for you to appreciate in its grace and beauty.
+
+```
+tag 1028 (FILESIZES): length 5
+    int32: 71296
+    int32: 4096
+    int32: 18009
+    int32: 5620
+    int32: 4430
+tag 1030 (FILEMODES): length 5
+    int16: 0o100755
+    int16: 0o40755
+    int16: 0o100644
+    int16: 0o100644
+    int16: 0o100644
+tag 1033 (FILERDEVS): length 5
+    int16: 0
+    int16: 0
+    int16: 0
+    int16: 0
+    int16: 0
+tag 1034 (FILEMTIMES): length 5
+    int32: 1472740798
+    int32: 1472740798
+    int32: 1092343095
+    int32: 1398112287
+    int32: 1398281952
+tag 1035 (FILEMD5S): length 5
+    string: 14c9b283109f49724b561a422ef6db0e7f6092572789b594c4c758b4af1cb19a
+    string: 
+    string: 204d8eff92f95aac4df6c8122bc1505f468f3a901e5a4cc08940e0ede1938994
+    string: 5e703bb68f8a0bc6eb22433a825e36609562668f311605c46af31a25f7a95c08
+    string: bbcd538f8da16fb0a6847a71b06272f155dd5becff44bc2cf8eaf72b3c3a76c4
+tag 1036 (FILELINKTOS): length 5
+    string: 
+    string: 
+    string: 
+    string: 
+    string: 
+tag 1037 (FILEFLAGS): length 5
+    int32: 0
+    int32: 0
+    int32: 2
+    int32: 2
+    int32: 2
+tag 1039 (FILEUSERNAME): length 5
+    string: root
+    string: root
+    string: root
+    string: root
+    string: root
+tag 1040 (FILEGROUPNAME): length 5
+    string: root
+    string: root
+    string: root
+    string: root
+    string: root
+tag 1045 (FILEVERIFYFLAGS): length 5
+    int32: -1
+    int32: -1
+    int32: -1
+    int32: -1
+    int32: -1
+tag 1095 (FILEDEVICES): length 5
+    int32: 1
+    int32: 1
+    int32: 1
+    int32: 1
+    int32: 1
+tag 1096 (FILEINODES): length 5
+    int32: 1
+    int32: 2
+    int32: 3
+    int32: 4
+    int32: 5
+tag 1097 (FILELANGS): length 5
+    string: 
+    string: 
+    string: 
+    string: 
+    string: 
+tag 1140 (FILECOLORS): length 5
+    int32: 2
+    int32: 0
+    int32: 0
+    int32: 0
+    int32: 0
+tag 1141 (FILECLASS): length 5
+    int32: 0
+    int32: 1
+    int32: 2
+    int32: 2
+    int32: 3
+tag 1143 (FILEDEPENDSX): length 5
+    int32: 0
+    int32: 0
+    int32: 0
+    int32: 0
+    int32: 0
+tag 1144 (FILEDEPENDSN): length 5
+    int32: 7
+    int32: 0
+    int32: 0
+    int32: 0
+    int32: 0
+tag 5011 (FILEDIGESTALGO): length 1
+    int32: 80
+```
+
+This would be even longer if I hadn't chosen a small package with only four files and one directory in it. The RPM
+header section includes the entire filesystem metadata of every single file or directory in its payload, down to device
+numbers for device files. You know, because there is [no way at all][tar-header] to store this information in a
+tarball...
+
+[tar-header]: https://en.wikipedia.org/wiki/Tar_(computing)#Header
+
+Granted, though, there are some useful things in here. For example, `RPMTAG_FILEMD5S` corresponds to the `md5sums` file
+in a Debian package's `control.tar.gz`.
+
+You might be wondering why this list up there contains all conceivable sorts of filesystem metadata, but not the
+file names themselves. That's because I saved the best for last. Remember the `rpmlib(CompressedFileNames)` dependency
+from earlier? Here's what it means:
+
+```
+tag 1117 (BASENAMES): length 5
+    string: tree
+    string: tree
+    string: LICENSE
+    string: README
+    string: tree.1.gz
+tag 1116 (DIRINDEXES): length 5
+    int32: 0 = 0x0 = 0o0
+    int32: 1 = 0x1 = 0o1
+    int32: 2 = 0x2 = 0o2
+    int32: 2 = 0x2 = 0o2
+    int32: 3 = 0x3 = 0o3
+tag 1118 (DIRNAMES): length 4
+    string: /usr/bin/
+    string: /usr/share/doc/
+    string: /usr/share/doc/tree/
+    string: /usr/share/man/man1/
+```
+
+Someone must have thought really hard about how to shave some bits off your regular RPM header, and after failing to
+come up with one of the few dozen obvious options, decided to deduplicate the directory names in the file name list.
+Here's how to read it: Every file (or directory) has its basename in the first list, and a directory index in the second
+list. The directory index goes into the third list and yields the dirname for the basename. Without "compressed file
+naems", this would look like this:
+
+```
+tag 1027 (OLDFILENAMES): length 5
+    string: /usr/bin/tree
+    string: /usr/share/doc/tree
+    string: /usr/share/doc/tree/LICENSE
+    string: /usr/share/doc/tree/README
+    string: /usr/share/man/man1/tree.1.gz
+```
+
+I don't say that this compressed encoding will not save some bytes for large packages that have a lot of files in a few
+directories, but it's a weird place to start optimizing when there's so much low-hanging fruit. For one, everything that
+we saw so far is stored in the RPM file **entirely uncompressed**. Only the payload (i.e. the actual files and
+directories) has XZ or LZMA compression.
+
+I already said that I saved the best for last before I showed you the compressed file names, but it's just so hard to
+choose the best part of this mess. So here's my other candidate:
+
+```
+tag 63 (HEADERIMMUTABLE): length 16
+    00000000  00 00 00 3f 00 00 00 07  ff ff fc 60 00 00 00 10  |...?.......`....|
+```
+
+Until now, all the fields were pretty obvious, and their meaning could be inferred more or less directly from my
+samples (except for the dependency flags, but the relevant ones are actually defined in the spec). But the
+`RPMTAG_HEADERIMMUTABLE` field had me stymied for quite some time. The spec has this to say about it:
+
+> This tag contains an index record which specifies the portion of the Header Record which was used for the calculation of
+> a signature. This data shall be preserved or any header-only signature will be invalidated.
+
+It all looks pretty obvious in retrospect, except that it says "header record" instead of "header section". Because I
+could not establish a relationship between these words up there and the 16 bytes of data in the tag, I looked through
+the source code of rpm-org (thus marking my final descent into madness), and found this concept under the name "region".
+I'll just copy-paste a comment from my implementation because it captures my original bewilderment perfectly:
+
+> I don't fully grasp the meaning, but it appears that a region tag marks a set of header tags and data that are to be
+> considered immutable, i.e.  they may be used for validation purposes, such as calculating hash digests and signatures.
+> I hope that I'm wrong, because this would imply that RPM has a concept of "metadata that's okay to manipulate even if
+> the package is GPG-signed", which is insane even for RPM's standards.  However, from what I've seen in the
+> implementation, their regions always seem to span the whole header structure, therefore marking everything as
+> immutable.
+>
+> We do the same thing. The index record for the region tag is at the *start* of the index record array, and its data is
+> located at the *end* of the data area. The data is another index record that (using a negative offset into the data
+> area) points back at the original index record. (I'm tempted to use the word "insane", but it feels like I use that
+> word so often when talking about RPM that it has lost all meaning.)
+
+And that's it for the header section.
+
+# The signature section
+
+Another thing that sets RPM apart from other package formats is that it includes signature right in the file, rather
+than e.g. a detached GPG signature in a separate file.
+
+Some of the signatures go over the header section, so they cannot go into the header section, which is why there is a
+signature section before the header section. And again, it's a key-value database. Let's see what's in it.
+
+```
+tag 62 (HEADERSIGNATURES): length 16
+    00000000  00 00 00 3e 00 00 00 07  ff ff ff 80 00 00 00 10  |...>............|
+```
+
+Another region tag that works the same way as above.
+
+```
+tag 269 (SHA1): length 1
+    string: 268371792c4ffd4e716111a182176c6922ae55ce
+tag 1004 (MD5): length 16
+    00000000  27 54 c3 9e 94 8e 68 d5  1e aa a9 82 8f 5c df 4c  |'T....h......\.L|
+```
+
+The SHA-1 checksum goes over the header section. The MD5 checksum goes over the header section plus the payload.
+
+```
+tag 1000 (SIZE): length 1
+    int32: 52270
+tag 1007 (PAYLOADSIZE): length 1
+    int32: 100168
+```
+
+These two are even weirder: `RPMSIGTAG_SIZE` is the byte count for the header section plus the payload.
+`RPMSIGTAG_PAYLOADSIZE` is the byte count for the **uncompressed** payload.
+
+```
+tag 268 (RSA): length 536
+    00000000  89 02 15 03 05 00 57 da  83 60 81 2a 6b 4b 64 da  |......W..`.*kKd.|
+    00000010  b8 5d 01 08 dc 84 0f ff  47 5b c6 39 93 c2 9d 75  |.]......G[.9...u|
+    00000020  90 cf b5 66 8e df fe 7c  62 37 a0 7f 3c 5d f2 80  |...f...|b7..<]..|
+    [...]
+tag 1002 (PGP): length 536
+    00000000  89 02 15 03 05 00 57 da  83 60 81 2a 6b 4b 64 da  |......W..`.*kKd.|
+    00000010  b8 5d 01 08 81 bb 10 00  80 f4 79 e8 cc 6a f9 3b  |.]........y..j.;|
+    00000020  be 2c 52 cb a6 2b 0a 7d  43 9b 4c 6f 41 94 e6 24  |.,R..+.}C.LoA..$|
+    [...]
+```
+
+Don't let the names fool you. These are both RSA signatures, formatted as a Version 3 Signature Packet as specified in
+[RFC 2440: OpenPGP Message Format][rfc2440]. `RPMSIGTAG_RSA` goes over the header section, `RPMSIGTAG_PGP` goes over the
+header section plus payload.
+
+[rfc2440]: https://tools.ietf.org/html/rfc2440
+
+And if doubly sure is not enough for you, you can be quadruply sure and add `RPMSIGTAG_DSA` and `RPMSIGTAG_GPG`, which
+are the same deal, but with DSA instead of RSA signatures. Nobody uses them anymore, though.
+
+But as always, I've saved the best for last. There's one last tag in the signature section that I want you to stare at
+and admire like a piece of art:
+
+```
+tag 1008 (RESERVEDSPACE): length 4096
+    00000000  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000010  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000020  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000030  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000040  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000050  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000060  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000070  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000080  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000090  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    000000a0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    000000b0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    000000c0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    000000d0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    000000e0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    000000f0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000100  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000110  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000120  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000130  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000140  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000150  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000160  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000170  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000180  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000190  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    000001a0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    000001b0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    000001c0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    000001d0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    000001e0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    000001f0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000200  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000210  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000220  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000230  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000240  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000250  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000260  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000270  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000280  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000290  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    000002a0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    000002b0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    000002c0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    000002d0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    000002e0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    000002f0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000300  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000310  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000320  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000330  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000340  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000350  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000360  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000370  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000380  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000390  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    000003a0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    000003b0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    000003c0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    000003d0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    000003e0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    000003f0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000400  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000410  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000420  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000430  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000440  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000450  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000460  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000470  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000480  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000490  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    000004a0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    000004b0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    000004c0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    000004d0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    000004e0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    000004f0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000500  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000510  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000520  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000530  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000540  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000550  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000560  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000570  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000580  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000590  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    000005a0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    000005b0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    000005c0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    000005d0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    000005e0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    000005f0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000600  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000610  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000620  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000630  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000640  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000650  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000660  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000670  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000680  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000690  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    000006a0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    000006b0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    000006c0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    000006d0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    000006e0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    000006f0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000700  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000710  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000720  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000730  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000740  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000750  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000760  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000770  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000780  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000790  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    000007a0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    000007b0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    000007c0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    000007d0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    000007e0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    000007f0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000800  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000810  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000820  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000830  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000840  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000850  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000860  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000870  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000880  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000890  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    000008a0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    000008b0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    000008c0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    000008d0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    000008e0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    000008f0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000900  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000910  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000920  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000930  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000940  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000950  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000960  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000970  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000980  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000990  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    000009a0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    000009b0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    000009c0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    000009d0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    000009e0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    000009f0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000a00  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000a10  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000a20  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000a30  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000a40  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000a50  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000a60  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000a70  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000a80  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000a90  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000aa0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000ab0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000ac0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000ad0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000ae0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000af0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000b00  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000b10  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000b20  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000b30  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000b40  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000b50  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000b60  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000b70  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000b80  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000b90  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000ba0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000bb0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000bc0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000bd0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000be0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000bf0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000c00  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000c10  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000c20  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000c30  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000c40  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000c50  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000c60  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000c70  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000c80  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000c90  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000ca0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000cb0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000cc0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000cd0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000ce0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000cf0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000d00  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000d10  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000d20  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000d30  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000d40  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000d50  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000d60  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000d70  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000d80  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000d90  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000da0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000db0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000dc0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000dd0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000de0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000df0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000e00  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000e10  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000e20  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000e30  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000e40  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000e50  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000e60  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000e70  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000e80  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000e90  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000ea0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000eb0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000ec0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000ed0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000ee0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000ef0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000f00  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000f10  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000f20  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000f30  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000f40  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000f50  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000f60  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000f70  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000f80  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000f90  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000fa0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000fb0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000fc0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000fd0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000fe0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+    00000ff0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+```
+
+While you stare and admire, recall that all of this is stored completely uncompressed.
+
+Since I don't know what to say anymore, I'll leave you with this little gem that I found in the C headers of RPM.
+Because if you're anything like me, you hate when your files have the wrong color.
+
+```
+/**
+ * File States (when installed).
+ */
+typedef enum rpmfileState_e {
+    RPMFILE_STATE_MISSING	= -1,	/* used for unavailable data */
+    RPMFILE_STATE_NORMAL 	= 0,
+    RPMFILE_STATE_REPLACED 	= 1,
+    RPMFILE_STATE_NOTINSTALLED	= 2,
+    RPMFILE_STATE_NETSHARED	= 3,
+    RPMFILE_STATE_WRONGCOLOR	= 4
+} rpmfileState;
+```
