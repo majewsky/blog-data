@@ -3,18 +3,18 @@
 As the first actual content on my new blog, let me tell you the story of how I went absolutely crazy.
 
 On my private systems, I ship configuration as system packages. Every distribution has their own tooling and process for
-building these packages, but I eventually grew tired of all the ceremony involved in it, and wrote [my own system
-package compiler][holo-build]. Since I'm using Arch Linux everywhere, the first version generated only Pacman packages,
-but I was determined to make it truly cross-distribution. The first step was support for Debian packages, which I
-implemented in a mere two evenings (one for understanding the format, one for writing the generator).
+building these packages, but I eventually grew tired of the ceremony involved in it, and wrote [my own system package
+compiler][holo-build]. Since I'm using Arch Linux everywhere, the first version generated only Pacman packages, but I
+was determined to make it truly cross-distribution. The first step was support for Debian packages, which I implemented
+in a mere two evenings (one for understanding the format, one for writing the generator).
 
 [holo-build]: https://github.com/holocm/holo-build
 
 Next to dpkg, the other widely deployed package format is RPM, so I set out to add support for RPM as well. If I could
 write the Debian generator in two days, then surely RPM support wouldn't take that long, either. Little did I know that
-I was embarking on a multi-month endeavor. To add insult to injury, I stubbornly refused to add dependencies and use
-existing tooling (i.e., the `rpm-build(1)` command). I wanted to serialize the format directly from my own code, like I
-did for Pacman and Debian packages.
+I was embarking on a multi-month endeavor (including multiple week-long breaks to restore my sanity). To add insult to
+injury, I stubbornly refused to add dependencies and use existing tooling (i.e., the `rpm-build(1)` command). I wanted
+to serialize the format directly from my own code, like I did for Pacman and Debian packages.
 
 ## How to get a package format right
 
@@ -36,6 +36,7 @@ tree_1.7.0-3_amd64.deb: Debian binary package (format 2.0)
 
 ```
 $ ar x tree_1.7.0-3_amd64.deb
+$ ls
 control.tar.gz  data.tar.xz  debian-binary  tree_1.7.0-3_amd64.deb
 
 $ cat debian-binary
@@ -114,8 +115,8 @@ The Debian approach with multiple archives is preferable, though, because you ca
 the single archive approach of Pacman, it might be that the metadata is put at the end of the tarball. You would then
 have to decompress the whole archive (possibly over a gigabyte) to get at a few kilobytes of metadata.
 
-By the way: Before we get to RPM, let me take a moment to acknowledge the outstanding [Debian Policy Manual][dpm], which
-specifies every last bit of the dpkg format in a relevant and concise manner. Kudos to everyone who contributed to it.
+By the way: I want to take a moment to acknowledge the outstanding [Debian Policy Manual][dpm], which specifies every
+last bit of the dpkg format in a relevant and concise manner. Kudos to everyone who contributed to it.
 
 [dpm]: https://www.debian.org/doc/debian-policy/index.html
 
@@ -167,7 +168,7 @@ Here's how it looks in my sample. I'm highlighting the fields in alternating col
 </code></pre>
 
 The spec tells us what everything means:
-* `major, minor = 3, 0` refers to the package format version 3.0.
+* `major = 3, minor = 0` refers to the package format version 3.0.
 * `type = 0` makes it a binary package (`1` would be a source package).
 * `archnum = 1` is x86. You might interject, "but it's actually an x86\_64 package!" To which RPM replies, "32-bit,
   64-bit... tomayto, tomahto."
@@ -200,8 +201,8 @@ backwards compatibility. What happened next is an effect so common in software d
 
 And that's exactly what happened. While Debian and Pacman packages use simple text files with `key: value` lines for
 their metadata, the RPM spec includes a custom binary format for a key-value database. Both the signature section and
-header section follow this format. My favorite part of all this is that because of this, an RPM file actually has
-**five** headers:
+header section follow this format. My favorite part of this is that because of this, an RPM file actually has **five**
+headers:
 
 * the lead section (deprecated)
 * the signature section
@@ -209,7 +210,7 @@ header section follow this format. My favorite part of all this is that because 
 * the header section
     * the header of its key-value database
 
-The key-value database's header looks like this:
+The key-value database's header looks like this (comments mine):
 
 ```c
 struct rpmheader {
@@ -221,7 +222,7 @@ struct rpmheader {
 ```
 
 After that comes one *index record* for each key-value pair, followed by the storage area. The index records look like
-this:
+this (comments mine):
 
 ```c
 struct rpmhdrindex {
@@ -234,7 +235,7 @@ struct rpmhdrindex {
 
 There are a few things to notice here:
 
-- The keys (or *tags* on RPM parlance) are numbers rather than strings. The `<rpm/rpmtag.h>` header has an enum with all
+- The keys (or *tags* in RPM parlance) are numbers rather than strings. The `<rpm/rpmtag.h>` header has an enum with all
   acceptable values, but please consider the environment before trying to print it. RPM 4.13 defines 318 tags (302 for
   the header section and 16 for the signature section). The equivalent `control` file in a Debian package has 29 fields.
 
@@ -303,7 +304,7 @@ documentation for openSUSE has [such a list][suse-group], but the Fedora Project
 unnecessary"][fedora-group].
 
 [suse-group]: https://en.opensuse.org/openSUSE:Package_group_guidelines
-[fedora-group]: https://fedoraproject.org/wiki/Packaging:Guidelines?rd=Packaging/Guidelines#Tags_and_sections
+[fedora-group]: https://fedoraproject.org/wiki/Packaging:Guidelines?rd=Packaging/Guidelines#Tags_and_Sections
 
 ```
 tag 1020 (URL): length 1
@@ -333,7 +334,7 @@ tag 1132 (PLATFORM): length 1
 ```
 
 With over 300 tags, it's no surprise that the usefulness of many of these tags is debatable, especially considering the
-recent push towards [reproducible packages](https://reproducible.debian.net).
+recent push towards [reproducible packages](https://reproducible-builds.org).
 
 The usefulness curve quickly goes downhill:
 
@@ -349,8 +350,11 @@ tag 1126 (PAYLOADFLAGS): length 1
 This tells us that the payload is a CPIO archive, compressed with XZ. You know, because there
 is [no way at all to infer this from the payload itself][magic]. Fun fact: This part of the dump shows that this Fedora
 RPM is actually *not LSB-compliant*. The LSB spec states clearly that the payload compressor must be `gzip`, and that
-`RPMTAG_PAYLOADFLAGS` must be `9`. If you're wondering what payload flags are: "This tag indicates the compression level
-used for the Payload." We've reached negative usefulness values.
+`RPMTAG_PAYLOADFLAGS` must be `9`. If you're wondering what payload flags are:
+
+> This tag indicates the compression level used for the Payload.
+
+We've reached negative usefulness values.
 
 [magic]: https://en.wikipedia.org/wiki/Magic_number_(programming)
 
@@ -402,7 +406,8 @@ tag 1113 (PROVIDEVERSION): length 2
     string: 1.7.0-7.fc26
 ```
 
-If this were a Debian package, this part would look like
+Each relation is split into three fields: the other package's name and version, and some flags. Now if this were a
+Debian package, this part would look like
 
 ```
 
@@ -447,14 +452,14 @@ enum rpmsenseFlags_e {
 };
 ```
 
-The name of the enum is probably a typing error because there is no sense anywhere to be found in RPM. The typical
-reaction to this code snippet goes like: "Let's see... zero is any, that makes sense. Then we have less, greater,
-equal... so far so good. Bit 4 is unused, well some legacy is to be expected. Then we have... What? Posttrans
-dependencies?  Interpreter used by what? rpmlib feature what what? And what the fuck is a keyring dependency?!?"
+The name of the enum is probably a typing error because there is no sense anywhere to be found in RPM. But let's look at
+the values... Zero is any, that makes sense. Then we have less, greater, equal... so far so good. Bit 4 is unused, well
+some legacy is to be expected. Then we have... What? Posttrans dependencies?  Interpreter used by what? rpmlib feature
+what what? And what the fuck is a keyring dependency?!?
 
-Now I can't explain every last bit of this since I reacted the same way, and documentation ranges from sparse to
-non-existent. But I can enlighten you on a particular bit in this field, `RPMSENSE_RPMLIB`. Let's look at the
-dependencies this package requires:
+As you can see, I can't explain every last bit of this, and documentation ranges from sparse to non-existent. But I can
+enlighten you on a particular bit in this field, `RPMSENSE_RPMLIB`. Let's look at the dependencies this package
+requires:
 
 ```
 tag 1048 (REQUIREFLAGS): length 11
@@ -507,8 +512,8 @@ rpmlib(PayloadFilesHavePrefix) = 4.0-1
 rpmlib(PayloadIsXz) = 5.2-1
 ```
 
-These dependencies are not actually dependencies. They are parsed by the RPM executable (hence the flag name "rpmlib")
-and trigger certain behavior.
+These dependencies are not actually dependencies. They are parsed by RPM (hence the flag name "rpmlib") and trigger
+certain behavior.
 
 Let me quickly recap how we got here: We are inside the third section of a file format, in a key-value database
 describing the package contents, in a very specific and completely unrelated part of the database, and people suddenly
@@ -517,7 +522,7 @@ start embedding structure information about the package itself in it.
 I literally can't even.
 
 (The only way I can explain this is that the dependency field is something that's readily accessible to packagers and
-flexible enough to store build options in without breaking older RPM implementations that try to read the spec.)
+flexible enough to store build options without breaking older RPM implementations that try to read the spec.)
 
 What are these version strings about, you say? Nothing. Just [arbitrary, hard-coded values][hardcoded] that must be
 replicated bit by bit if you want to generate a valid RPM. Please take a moment to let this sink in: The version field
@@ -675,11 +680,11 @@ tag 1118 (DIRNAMES): length 4
     string: /usr/share/man/man1/
 ```
 
-Someone must have thought really hard about how to shave some bits off your regular RPM header, and after failing to
+Someone must have thought really hard about how to shave some bytes off your regular RPM header, and after failing to
 come up with one of the few dozen obvious options, decided to deduplicate the directory names in the file name list.
 Here's how to read it: Every file (or directory) has its basename in the first list, and a directory index in the second
 list. The directory index goes into the third list and yields the dirname for the basename. Without "compressed file
-naems", this would look like this:
+names", we would instead see:
 
 ```
 tag 1027 (OLDFILENAMES): length 5
@@ -693,7 +698,7 @@ tag 1027 (OLDFILENAMES): length 5
 I don't say that this compressed encoding will not save some bytes for large packages that have a lot of files in a few
 directories, but it's a weird place to start optimizing when there's so much low-hanging fruit. For one, everything that
 we saw so far is stored in the RPM file **entirely uncompressed**. Only the payload (i.e. the actual files and
-directories) has XZ or LZMA compression.
+directories) has `xz` or LZMA compression.
 
 I already said that I saved the best for last before I showed you the compressed file names, but it's just so hard to
 choose the best part of this mess. So here's my other candidate:
@@ -710,10 +715,9 @@ samples (except for the dependency flags, but the relevant ones are actually def
 > This tag contains an index record which specifies the portion of the Header Record which was used for the calculation of
 > a signature. This data shall be preserved or any header-only signature will be invalidated.
 
-It all looks pretty obvious in retrospect, except that it says "header record" instead of "header section". Because I
-could not establish a relationship between these words up there and the 16 bytes of data in the tag, I looked through
-the source code of rpm-org (thus marking my final descent into madness), and found this concept under the name "region".
-I'll just copy-paste a comment from my implementation because it captures my original bewilderment perfectly:
+Because I could not establish a relationship between these words up there and the 16 bytes of data in the tag, I looked
+through the source code of rpm-org (thus marking my final descent into madness), and found this concept under the name
+"region".  I'll just copy-paste a comment from my implementation because it captures my original bewilderment perfectly:
 
 > I don't fully grasp the meaning, but it appears that a region tag marks a set of header tags and data that are to be
 > considered immutable, i.e.  they may be used for validation purposes, such as calculating hash digests and signatures.
@@ -727,15 +731,13 @@ I'll just copy-paste a comment from my implementation because it captures my ori
 > area) points back at the original index record. (I'm tempted to use the word "insane", but it feels like I use that
 > word so often when talking about RPM that it has lost all meaning.)
 
-And that's it for the header section.
-
 # The signature section
 
-Another thing that sets RPM apart from other package formats is that it includes signature right in the file, rather
+Another thing that sets RPM apart from other package formats is that it includes signatures right in the file, rather
 than e.g. a detached GPG signature in a separate file.
 
-Some of the signatures go over the header section, so they cannot go into the header section, which is why there is a
-signature section before the header section. And again, it's a key-value database. Let's see what's in it.
+Some of the signatures go over the header section, so they cannot go into there. So there is a signature section before
+the header section. And again, it's a key-value database. Let's see what's in it.
 
 ```
 tag 62 (HEADERSIGNATURES): length 16
@@ -751,7 +753,8 @@ tag 1004 (MD5): length 16
     00000000  27 54 c3 9e 94 8e 68 d5  1e aa a9 82 8f 5c df 4c  |'T....h......\.L|
 ```
 
-The SHA-1 checksum goes over the header section. The MD5 checksum goes over the header section plus the payload.
+The SHA-1 checksum goes over the header section. The MD5 checksum goes over the header section plus the payload. Also,
+the first one is a hex-encoded string, the second one is binary data.
 
 ```
 tag 1000 (SIZE): length 1
@@ -760,8 +763,8 @@ tag 1007 (PAYLOADSIZE): length 1
     int32: 100168
 ```
 
-These two are even weirder: `RPMSIGTAG_SIZE` is the byte count for the header section plus the payload.
-`RPMSIGTAG_PAYLOADSIZE` is the byte count for the **uncompressed** payload.
+These two are even weirder: `RPMSIGTAG_SIZE` is the byte count for the header section plus the *compressed* payload.
+`RPMSIGTAG_PAYLOADSIZE` is the byte count for the *uncompressed* payload.
 
 ```
 tag 268 (RSA): length 536
@@ -785,7 +788,7 @@ header section plus payload.
 And if doubly sure is not enough for you, you can be quadruply sure and add `RPMSIGTAG_DSA` and `RPMSIGTAG_GPG`, which
 are the same deal, but with DSA instead of RSA signatures. Nobody uses them anymore, though.
 
-But as always, I've saved the best for last. There's one last tag in the signature section that I want you to stare at
+But as always, I've saved the best for last. There's one last tag in this signature section that I want you to stare at
 and admire like a piece of art:
 
 ```
@@ -1067,5 +1070,5 @@ typedef enum rpmfileState_e {
 } rpmfileState;
 ```
 
-*P.S.* I want to turn this post into a talk soon-ish. If you want me to speak at your hackfest or conference,
-please [contact me on Twitter](https://twitter.com/stefanmajewsky).
+*P.S.* I plan to turn this post into a 30-minute talk. If you like the idea of me giving this talk at your hackfest or
+conference, please [contact me on Twitter](https://twitter.com/stefanmajewsky).
