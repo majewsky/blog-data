@@ -4,10 +4,11 @@ As the first actual content on my new blog, let me tell you the story of how I w
 
 On my private systems, I ship configuration as system packages. Every distribution has their own tooling and process for
 building these packages, but I eventually grew tired of all the ceremony involved in it, and wrote [my own system
-package compiler](https://github.com/holocm/holo-build). Since I'm using Arch Linux everywhere, the first version
-generated only Pacman packages, but I was determined to make it truly cross-distribution. The first step was support for
-Debian packages, which I implemented in a mere two evenings (one for understanding the format, one for writing the
-generator).
+package compiler][holo-build]. Since I'm using Arch Linux everywhere, the first version generated only Pacman packages,
+but I was determined to make it truly cross-distribution. The first step was support for Debian packages, which I
+implemented in a mere two evenings (one for understanding the format, one for writing the generator).
+
+[holo-build]: https://github.com/holocm/holo-build
 
 Next to dpkg, the other widely deployed package format is RPM, so I set out to add support for RPM as well. If I could
 write the Debian generator in two days, then surely RPM support wouldn't take that long, either. Little did I know that
@@ -29,8 +30,9 @@ tree_1.7.0-3_amd64.deb: Debian binary package (format 2.0)
 - data
 ```
 
-`file` tells us that a Debian package is actually an [`ar` archive](https://en.wikipedia.org/wiki/Ar_(Unix)). Let's
-unpack it.
+`file` tells us that a Debian package is actually an [`ar` archive][ar]. Let's unpack it.
+
+[ar]: https://en.wikipedia.org/wiki/Ar_(Unix)
 
 ```
 $ ar x tree_1.7.0-3_amd64.deb
@@ -112,9 +114,10 @@ The Debian approach with multiple archives is preferable, though, because you ca
 the single archive approach of Pacman, it might be that the metadata is put at the end of the tarball. You would then
 have to decompress the whole archive (possibly over a gigabyte) to get at a few kilobytes of metadata.
 
-By the way: Before we get to RPM, let me take a moment to acknowledge the outstanding
-[Debian Policy Manual](https://www.debian.org/doc/debian-policy/index.html), which specifies every last bit of the
-dpkg format in a relevant and concise manner. Kudos to everyone who contributed to it.
+By the way: Before we get to RPM, let me take a moment to acknowledge the outstanding [Debian Policy Manual][dpm], which
+specifies every last bit of the dpkg format in a relevant and concise manner. Kudos to everyone who contributed to it.
+
+[dpm]: https://www.debian.org/doc/debian-policy/index.html
 
 ## Cracking open an RPM file
 
@@ -1063,3 +1066,6 @@ typedef enum rpmfileState_e {
     RPMFILE_STATE_WRONGCOLOR	= 4
 } rpmfileState;
 ```
+
+*P.S.* I want to turn this post into a talk soon-ish. If you want me to speak at your hackfest or conference,
+please [contact me on Twitter](https://twitter.com/stefanmajewsky).
