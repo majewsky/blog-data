@@ -8,4 +8,4 @@ dollars. If you, too, like the idea of a more secure and privacy-respecting
 web, please consider giving generously, too.
 
 [le]: https://letsencrypt.org
-[fr]: https://letsencrypt.org/donate/
+[cc]: https://letsencrypt.org/donate/
