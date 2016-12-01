@@ -501,7 +501,12 @@ tag 1050 (REQUIREVERSION): length 11
 ```
 
 I have no idea why there are six dependencies to different versions of `libc.so.6`, and why they encoded the version in
-the name field rather than in the version field. But the thing that's even more brilliant is the four dependencies below
+the name field rather than in the version field.
+
+**Update:** I've been told that these strange libc dependencies refer to different ABIs supported by the same libc
+binary. That's somehow even worse than what I was imagining.
+
+But the thing that's even more brilliant is the four dependencies below
 that. The flags include the `RPMSENSE_RPMLIB` bit from before, and the names are all like `rpmlib(SomeThing)`. Let's
 write them down more nicely:
 
