@@ -1,17 +1,21 @@
 html {
-    background: #FFE;
+    background: #FFFFF4;
+    font-size: 18px; /* needs to be set here to establish the correct root-em */
 }
 
 body {
-    max-width: 800px;
-    margin: 40px auto;
-    padding: 0 10px;
-    font-size: 18px;
+    margin: 40px 0 0 0;
     font-family: "Source Sans Pro", system-ui, sans-serif;
     line-height: 1.6;
     text-rendering: optimizeLegibility;
     font-variant-ligatures: common-ligatures;
     font-kerning: normal;
+}
+
+body > * {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 0 10px;
 }
 
 h1, h2, h3 {
@@ -59,4 +63,25 @@ blockquote {
     margin-left: 1rem;
     margin-right: 2rem;
     padding-left: 1rem;
+}
+
+footer {
+    background: #C33;
+    color: #FFFFF4;
+    /* extend to the bottom of the screen if the page is shorter than the screen */
+    box-shadow: 0 100vh 0 100vh #C33; /* https://stackoverflow.com/a/18935218 */
+}
+
+footer:before, footer:after {
+    content: "";
+    display: table;
+    clear: both;
+}
+
+footer > img {
+    float: left;
+    margin: 1rem;
+    max-width: 20vw;
+    border-radius: 50%;
+    box-shadow: 0 0 2px black;
 }
