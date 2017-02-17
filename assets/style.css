@@ -4,7 +4,7 @@ html {
 }
 
 body {
-    margin: 40px 0 0 0;
+    margin: 0;
     font-family: "Source Sans Pro", system-ui, sans-serif;
     line-height: 1.6;
     text-rendering: optimizeLegibility;
@@ -30,13 +30,24 @@ p {
     text-align: justify;
 }
 
-header, h1 a {
+header {
     text-align: center;
-    color: #C33;
+    /* extend background to the sides of the screen and to the top */
+    box-shadow: 0 -500vh 0 500vh #C33; /* https://stackoverflow.com/a/18935218 */
+}
+
+header h1 {
+    margin: 0.5rem 0;
+}
+
+header, header h1 a {
+    background: #C33;
+    color: #FFFFF4;
 }
 
 nav {
     text-align: center;
+    margin-top: 1rem;
 }
 
 a {
@@ -68,10 +79,11 @@ blockquote {
 footer {
     background: #C33;
     color: #FFFFF4;
-    /* extend to the bottom of the screen if the page is shorter than the screen */
-    box-shadow: 0 100vh 0 100vh #C33; /* https://stackoverflow.com/a/18935218 */
+    /* extend background to the sides of the screen, and also to the bottom if the page is shorter than the screen */
+    box-shadow: 0 500vh 0 500vh #C33; /* https://stackoverflow.com/a/18935218 */
 }
 
+header:before, header:after,
 footer:before, footer:after {
     content: "";
     display: table;
