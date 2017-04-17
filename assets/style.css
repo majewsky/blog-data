@@ -3,6 +3,16 @@ html {
     font-size: 18px; /* needs to be set here to establish the correct root-em */
 }
 
+.scroll-indicator {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 50%;
+    height: 3px;
+    background: #C33;
+}
+
 body {
     margin: 0;
     font-family: "Source Sans Pro", system-ui, sans-serif;
