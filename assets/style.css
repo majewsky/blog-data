@@ -107,3 +107,8 @@ footer > img {
     border-radius: 50%;
     box-shadow: 0 0 2px black;
 }
+
+footer .disclaimer {
+    clear: left;
+    font-style: italic;
+}
