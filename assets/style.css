@@ -108,7 +108,12 @@ footer > img {
     box-shadow: 0 0 2px black;
 }
 
-footer .disclaimer {
+footer .legal {
     clear: left;
     font-style: italic;
+}
+
+footer .legal a {
+    color: inherit !important;
+    text-decoration: underline !important;
 }
