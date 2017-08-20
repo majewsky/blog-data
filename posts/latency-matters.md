@@ -59,3 +59,8 @@ this were a new notebook, not the same one that I've been using for five years n
 
 The point is, latency really *is* important for how an application or a system feels. I will definitely care more about
 responsiveness of my programs in the future after this experience.
+
+## Update
+
+This has been [discussed on Hacker News](https://news.ycombinator.com/item?id=15059795), and lead to a semi-related
+[followup of mine](/posts/latency-matters-aftermath.html).
