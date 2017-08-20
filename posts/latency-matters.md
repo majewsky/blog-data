@@ -14,7 +14,7 @@ current Git branch and commit, the current kubectl context, and which OpenStack 
 knows some quite unique tricks. For example, if the current working directory is not accessible anymore, it highlights
 the inaccessible path elements. Or, inside a Git repository, it highlights the path elements inside the repo.
 
-![prettyprompt screenshot](https://raw.githubusercontent.com/majewsky/gofu/master/screenshot-prettyprompt.png)
+![prettyprompt screenshot](/assets/post-images/screenshot-prettyprompt.png)
 
 Since that's quite a lot of logic, I delegated the rendering of the entire prompt to a custom program. That program used
 to be a [Python 2
