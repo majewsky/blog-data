@@ -8,6 +8,8 @@ wondering: Can I really perceive a difference between 5 ms latency and 45 ms lat
 
 Turns out that I can.
 
+## Where I came from
+
 Like probably all shell configurations, mine has a prompt, that is: It displays some contextual data when I can enter
 the next command. Most prompts include the username, hostname, and the current working directory. Mine can also include the
 current Git branch and commit, the current kubectl context, and which OpenStack credentials are currently loaded. It
@@ -42,6 +44,8 @@ python2 -c 0 > /dev/null  0,02s user 0,01s system 52% cpu 0,050 total
 
 The Go program, on the other hand, does not need to start a runtime. It's probably short-lived enough to never even
 garbage-collect.
+
+## The "Wow effect"... I guess?
 
 I did these measurements while I was still writing the Go program, just for fun. But only after switching to the new
 prompt did I realize how much snappier my terminal feels just because of this change. There was always this short gap
