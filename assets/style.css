@@ -70,6 +70,10 @@ section a:active, section a:visited {
     color: #966;
 }
 
+article > p > img {
+    max-width: 100%;
+}
+
 pre {
     border-radius: 5px;
     padding: 0 0.5rem;
