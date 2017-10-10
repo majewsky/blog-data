@@ -1,5 +1,5 @@
 html {
-    background: #F6F6EF;
+    background: white;
     font-size: 18px; /* needs to be set here to establish the correct root-em */
 }
 
@@ -77,7 +77,7 @@ p > img {
 pre {
     border-radius: 5px;
     padding: 0 0.5rem;
-    background: #DDC;
+    background: #F6F6EF;
     font-variant-ligatures: none;
     max-width: 100%;
     overflow-x: auto;
