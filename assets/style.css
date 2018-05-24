@@ -117,7 +117,7 @@ footer .legal {
     font-style: italic;
 }
 
-footer .legal a {
+footer a {
     color: inherit !important;
     text-decoration: underline !important;
 }
