@@ -15,6 +15,6 @@ E-Mail: (surname/<em>Nachname</em>) (at) posteo.de
 
 # Data privacy statement/Datenschutzerklärung
 
-There is no recording of personal data of users.
+No system under my control records any personal data of users of this website.
 
-*Eine Erhebung von personenbezogenen Daten der Nutzer der Website findet nicht statt.*
+*Eine Erhebung von personenbezogenen Daten der Nutzer dieser Website findet durch technische Einrichtungen in meinem Einflussbereich nicht statt.*
