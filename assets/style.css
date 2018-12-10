@@ -107,6 +107,7 @@ footer:before, footer:after {
 footer > img {
     float: left;
     margin: 1rem;
+    width: 200px;
     max-width: 20vw;
     border-radius: 50%;
     box-shadow: 0 0 2px black;
